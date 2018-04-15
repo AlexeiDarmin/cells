@@ -26,12 +26,12 @@ class World extends Component {
 
   renderCell(cell, key) {
     const styles = {
-      marginLeft: cell.position.x,
-      marginTop: cell.position.y,
+      marginLeft: cell.position.x * 4,
+      marginTop: cell.position.y * 4,
       backgroundColor: cell.lineage,
     }
 
-    return (<div className="cell" style={styles} key={key}/>)
+    return (<div className="cell" style={styles} key={cell.id}/>)
   }
 
   render() {

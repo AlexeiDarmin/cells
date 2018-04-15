@@ -28,8 +28,8 @@
 }
 
 .world {
-  width: 250px;
-  height: 250px;
+  width: 100px;
+  height: 100px;
   background: green;
   margin: auto;
   margin-top: 100px;
@@ -42,4 +42,7 @@
   height: 4px;
   display: block;
   border-radius: 50%;
+  
+  transition: all 100ms;
+  transition-timing-function: ease-in-out;
 }
