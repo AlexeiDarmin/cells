@@ -28,7 +28,9 @@ class Simulation {
       cells.push(newCell)
       this.board[newCell.position.x][newCell.position.y] = newCell
     }
-
+    cells.map(c => {
+      console.log(c)
+    })
     this.cells = cells
   }
 
@@ -49,7 +51,7 @@ class Simulation {
   reproduceCells = () => {
     const newCells = []
     this.cells.map(c => {
-      if (c.age % 100 === 0) {
+      if (c.age % (c.reproductionRate / 60 * 3000) === 0) {
         const newCell = this.tryToReproduce(c)
         if (newCell) {
           newCells.push(newCell)
@@ -82,7 +84,7 @@ class Simulation {
   ageCells = () => {
     this.cells = this.cells.map(c => {
       c.age++
-      if (c.age / 60 > c.maxAge * 1000) return null // cell death by old age
+      if (c.age / 60 > c.maxAge * 100) return null // cell death by old age
       return c
     }).filter(c => c !== null)
   }
@@ -102,6 +104,7 @@ class Simulation {
       attack: getRandomArbitrary(50, MAX_STAT),
       agility: getRandomArbitrary(50, MAX_STAT),
       maxAge: getRandomArbitrary(50, MAX_STAT),
+      reproductionRate: getRandomArbitrary(50, MAX_STAT),
       lineage: getRandomColor(),
       age: 0,
       id: uuid(),
@@ -115,6 +118,7 @@ class Simulation {
       attack: mutateProperty(cell.attack),
       agility: mutateProperty(cell.agility),
       maxAge: mutateProperty(cell.agility),
+      reproductionRate: mutateProperty(cell.reproductionRate),
       age: 0,
       id: uuid(),
       lineage: cell.lineage,
@@ -124,14 +128,15 @@ class Simulation {
 
   // Rebalances cell traits such they the sum of all traits is equal to 100.
   balanceCell = (cell) => {
-    const { health, attack, agility, maxAge } = cell
-    const sum = health + attack + agility + maxAge
+    const { health, attack, agility, maxAge, reproductionRate } = cell
+    const sum = health + attack + agility + maxAge + reproductionRate
 
     return {
       health: Math.round((health / sum) * 100),
       attack: Math.round((attack / sum) * 100),
       agility: Math.round((agility / sum) * 100),
       maxAge: Math.round((maxAge / sum) * 100),
+      reproductionRate: Math.round((reproductionRate / sum) * 100),
       age: cell.age,
       position: cell.position,
       lineage: cell.lineage,
@@ -163,6 +168,7 @@ class Simulation {
           return null
         }
       } else {
+        cell.health -= 0.05 // damage for being stationary
         return null
       }
     }
@@ -176,11 +182,13 @@ class Simulation {
   }
 
   fightCells(c1, c2) {
-    debugger
     while (c1.health > 0 && c2.health > 0) {
-      c2.health -= c1.attack
-      c1.health -= c2.attack
-      // apply agility
+      if (getRandomArbitrary(0, 100) > c2.agility) {
+        c2.health -= c1.attack
+      }
+      if (getRandomArbitrary(0, 100) > c1.agility) {
+        c1.health -= c2.attack
+      }
     }
 
     return {
@@ -211,7 +219,7 @@ function getRandomArbitrary(min, max) {
 function mutateProperty(property) {
   const v = getRandomArbitrary(-0.03, 0.03) * property
 
-  return v > 0 ? v : 0.01
+  return v > 0 ? v : 1
 }
 
 // Randomly considers moving a cell, if the area where the cell wants to move is occupied, the cell does not move.

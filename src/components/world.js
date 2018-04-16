@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Simulation from '../helpers/simulation'
 import '../App.css';
 
-let sim = new Simulation(10)
+let sim = new Simulation(25)
 
 class World extends Component {
 
