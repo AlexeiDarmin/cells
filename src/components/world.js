@@ -15,7 +15,6 @@ class World extends Component {
   }
 
   componentDidMount(){
-    debugger
     sim.start()
     setInterval(() => {
       this.setState({

@@ -1,5 +1,5 @@
 // Map constants
-const MAP_SIZE = 100
+const MAP_SIZE = 200
 const CELL_SIZE = 4
 const MAX_VALID_POSITION = (MAP_SIZE / CELL_SIZE) - 1
 
@@ -26,13 +26,8 @@ class Simulation {
     for (let i = 0; i < cellCount; ++i) {
       const newCell = this.createRandomCell()
       cells.push(newCell)
-      this.board[newCell.position.x][newCell.position.y] = 1
+      this.board[newCell.position.x][newCell.position.y] = newCell
     }
-
-    // initializes board state based on cell positions
-    cells.forEach(c => {
-      board[c.position.x][c.position.y] = 1
-    })
 
     this.cells = cells
   }
@@ -55,10 +50,33 @@ class Simulation {
     const newCells = []
     this.cells.map(c => {
       if (c.age % 100 === 0) {
-        newCells.push(this.createMutatedCellFromCell(c))
+        const newCell = this.tryToReproduce(c)
+        if (newCell) {
+          newCells.push(newCell)
+        }
       }
     })
     this.cells = [...this.cells, ...newCells]
+  }
+
+  // Tries to create a mutated cell adjacent to given cell and returns new cell upon success
+  // If all adjacent grids are occupied, then nothing happens.
+  tryToReproduce = (cell) => {
+    const { position: { x, y } } = cell
+    const board = this.board
+    let newPosition = null
+    if (y < MAX_VALID_POSITION && board[x, y + 1] === 0) {
+      newPosition = { x: x, y: y + 1 }
+    } else if (y > 0 && board[x][y - 1] === 0) {
+      newPosition = { x: x, y: y - 1 }
+    } else if (x > 0 && board[x - 1][y] === 0) {
+      newPosition = { x: x - 1, y: y }
+    } else if (x < MAX_VALID_POSITION && board[x + 1][y] === 0) {
+      newPosition = { x: x + 1, y: y }
+    }
+
+    if (newPosition !== null) return this.createMutatedCellFromCell(cell, newPosition)
+    return
   }
 
   ageCells = () => {
@@ -71,13 +89,11 @@ class Simulation {
 
   moveCells = () => {
     this.cells = this.cells.map(c => {
+      if (!c || c.health < 0) return null
       if (c.age % 4 !== 0) return c
-
-      const { position } = c
-      const newPosition = mutatePosition(position, this.board)
-      c.position = newPosition
-      return c
-    })
+      this.moveOrAttack(c)
+      return (c.health > 0) ? c : null
+    }).filter(c => c !== null)
   }
 
   createRandomCell = () => {
@@ -89,11 +105,11 @@ class Simulation {
       lineage: getRandomColor(),
       age: 0,
       id: uuid(),
-      position: generateRandomEmptyPosition(this.board)
+      position: this.generateRandomEmptyPosition()
     })
   }
 
-  createMutatedCellFromCell = (cell) => {
+  createMutatedCellFromCell = (cell, position) => {
     return this.balanceCell({
       health: mutateProperty(cell.health),
       attack: mutateProperty(cell.attack),
@@ -102,7 +118,7 @@ class Simulation {
       age: 0,
       id: uuid(),
       lineage: cell.lineage,
-      position: mutatePosition(cell.position, this.board)
+      position: position
     })
   }
 
@@ -112,15 +128,78 @@ class Simulation {
     const sum = health + attack + agility + maxAge
 
     return {
-      health: health / sum,
-      attack: attack / sum,
-      agility: agility / sum,
-      maxAge: maxAge / sum,
+      health: Math.round((health / sum) * 100),
+      attack: Math.round((attack / sum) * 100),
+      agility: Math.round((agility / sum) * 100),
+      maxAge: Math.round((maxAge / sum) * 100),
       age: cell.age,
       position: cell.position,
       lineage: cell.lineage,
       id: cell.id,
     }
+  }
+
+  moveOrAttack = (cell) => {
+    const { position } = cell
+    const { board } = this
+
+    const newPosition = mutatePosition(position, board)
+
+    if (board[newPosition.x][newPosition.y] !== 0) {
+      const cell2 = board[newPosition.x][newPosition.y]
+
+      if (cell2.lineage !== cell.lineage) {
+        const { c1, c2 } = this.fightCells(cell, cell2)
+
+        if (c1.health < 0 && c2.health < 0) {
+          board[c2.position.x][c2.position.y] = 0
+          board[c1.position.x][c1.position.y] = 0
+          return null
+        } else if (c2.health < 0) {
+          board[c2.position.x][c2.position.y] = 0
+          return this.moveCell(cell, newPosition)
+        } else if (c1.health < 0) {
+          board[c1.position.x][c1.position.y] = 0
+          return null
+        }
+      } else {
+        return null
+      }
+    }
+    return this.moveCell(cell, newPosition)
+  }
+
+  moveCell(c, newPosition) {
+    this.board[c.position.x][c.position.y] = 0
+    c.position = newPosition
+    this.board[c.position.x][c.position.y] = c
+  }
+
+  fightCells(c1, c2) {
+    debugger
+    while (c1.health > 0 && c2.health > 0) {
+      c2.health -= c1.attack
+      c1.health -= c2.attack
+      // apply agility
+    }
+
+    return {
+      c1,
+      c2
+    }
+  }
+
+  // Hacky way to keep randomly generating positions until an empty one is found
+  generateRandomEmptyPosition() {
+    const board = this.board
+    let emptyPosition = false
+    let position
+    while (!emptyPosition) {
+      position = generateRandomPosition()
+      if (board[position.x][position.y] === 0) emptyPosition = true
+    }
+
+    return position
   }
 
 }
@@ -130,7 +209,9 @@ function getRandomArbitrary(min, max) {
 }
 
 function mutateProperty(property) {
-  return getRandomArbitrary(-0.03, 0.03) * property
+  const v = getRandomArbitrary(-0.03, 0.03) * property
+
+  return v > 0 ? v : 0.01
 }
 
 // Randomly considers moving a cell, if the area where the cell wants to move is occupied, the cell does not move.
@@ -140,27 +221,13 @@ function mutatePosition(position, board) {
 
   const newX = (newXRaw < 0) ? 0 : (newXRaw <= MAX_VALID_POSITION) ? newXRaw : MAX_VALID_POSITION
   const newY = (newYRaw < 0) ? 0 : (newYRaw <= MAX_VALID_POSITION) ? newYRaw : MAX_VALID_POSITION
-  try {
-    if (board[newX][newY] === 1) return position
-  } catch (e) {
-    debugger
-  }
+
+  // if (board[newX][newY] !== 0) return position
+
   return {
     x: newX,
     y: newY
   }
-}
-
-// Hacky way to keep randomly generating positions until an empty one is found
-function generateRandomEmptyPosition(board) {
-  let emptyPosition = false
-  let position
-  while (!emptyPosition) {
-    position = generateRandomPosition()
-    if (board[position.x][position.y] === 0) emptyPosition = true
-  }
-
-  return position
 }
 
 function generateRandomPosition() {
