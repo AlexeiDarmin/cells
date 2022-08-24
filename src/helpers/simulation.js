@@ -84,6 +84,7 @@ class Simulation {
   ageCells = () => {
     this.cells = this.cells.map(c => {
       c.age++
+
       if (c.age / 60 > c.maxAge * 100) return null // cell death by old age
       return c
     }).filter(c => c !== null)
